@@ -6,7 +6,7 @@
 
 **Cart-Pole-v1 (DQN)**
 
-![cart-pole-770](https://raw.githubusercontent.com/joonas-yoon/practice-on-rl/d0c0f96e14bdcf15dc5182efa397d5cdff03a9ff/dqn_v1%2B/screenshots/cartpolev1_770.gif)
+![cart-pole-790](https://raw.githubusercontent.com/joonas-yoon/practice-on-rl/08e6ebbba39ce04909ac047b8ae568e201b83657/cartpole/dqn_tutorial_en/screenshots/0790.gif)
 
 **Mountain-Car (DQN)**
 
