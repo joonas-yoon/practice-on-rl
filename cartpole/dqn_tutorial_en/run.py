@@ -94,26 +94,10 @@ def get_cart_location(screen_width):
     return int(env.state[0] * scale + screen_width / 2.0)  # MIDDLE OF CART
 
 # %%
-def get_screen(fullscreen=False, size=SCREEN_SIZE_TRAIN):
+def get_screen(size=SCREEN_SIZE_TRAIN):
     # gym이 요청한 화면은 400x600x3 이지만, 가끔 800x1200x3 처럼 큰 경우가 있습니다.
     # 이것을 Torch order (CHW)로 변환한다.
     screen = env.render().transpose((2, 0, 1))
-
-    if not fullscreen:
-        # 카트는 아래쪽에 있으므로 화면의 상단과 하단을 제거하십시오.
-        _, screen_height, screen_width = screen.shape
-        screen = screen[:, int(screen_height*0.4):int(screen_height * 0.8)]
-        view_width = int(screen_width * 0.6)
-        cart_location = get_cart_location(screen_width)
-        if cart_location < view_width // 2:
-            slice_range = slice(view_width)
-        elif cart_location > (screen_width - view_width // 2):
-            slice_range = slice(-view_width, None)
-        else:
-            slice_range = slice(cart_location - view_width // 2,
-                                cart_location + view_width // 2)
-        # 카트를 중심으로 정사각형 이미지가 되도록 가장자리를 제거하십시오.
-        screen = screen[:, :, slice_range]
 
     # float 으로 변환하고,  rescale 하고, torch tensor 로 변환하십시오.
     # (이것은 복사를 필요로하지 않습니다)
@@ -226,6 +210,7 @@ def load_log(path):
             best={
                 'step': 0,
                 'screens': [],
+                'actions': [],
                 'duration': 0,
             }
         )
@@ -252,7 +237,7 @@ def save_log(path):
             best=exclude_keys(best_score, ['screens']),
         )
         json.dump(obj, fp=f)
-        print(f'\nsave log to {path}')
+        # print(f'\nsave log to {path}')
 
 # %%
 def plot_progress(show_result=False):
@@ -291,7 +276,7 @@ def plot_progress(show_result=False):
     if is_ipython:
         plt.show()
     else:
-        plt.savefig('plot/train.png', dpi=300)
+        plt.savefig('plot/train.png', dpi=200)
         plt.close()
 
 # %%
@@ -304,10 +289,14 @@ def tensor_to_np(t):
 def np_to_pil(np_img):
     return Image.fromarray(np.uint8(np_img * 255.), mode="RGB")
 
-def save_screenshots(screens):
-    duration = len(screens)
+def action_to_str(action):
+    return ['LEFT', 'RIGHT'][action]
 
-    fp_out = f"screenshots/cartpolev1_{duration:03}.gif"
+def save_screenshots(screens: list, actions: list):
+    duration = max(len(screens), len(actions))
+    if duration < 1: return
+
+    fp_out = f"screenshots/{duration:04}.gif"
 
     with contextlib.ExitStack() as stack:
         imgs = []
@@ -317,9 +306,9 @@ def save_screenshots(screens):
             resize_img = resize(240)(tensor.squeeze(0))
             pil_img = np_to_pil(tensor_to_np(resize_img.cpu()))
             draw = ImageDraw.Draw(pil_img)
-            draw.text((10, 10), f'duration: {i}', fill=(200, 0, 0), font=font)
-            if i + 1 == len(screens):
-                pil_img.info.update({'duration': 1000})
+            draw.text((10, 10), f'step: {i}', fill=(200, 0, 0), font=font)
+            action = action_to_str(actions[i])
+            draw.text((10, 30), f'action: {action}', fill=(0, 0, 200), font=font)
             imgs.append(pil_img)
 
         # https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html#gif
@@ -375,12 +364,14 @@ def optimize_model():
 def get_progress_desc():
     steps = len(episode_durations)
     eps = get_epsilon(steps, EPS_DECAY)
+    latest_du = episode_durations[-1] if steps > 0 else None
+    mean30 = np.mean(episode_durations[-30:]) if steps > 0 else np.nan
     strs = [
         f"steps={steps}",
-        f"du={np.mean(episode_durations[-1:]):.0f}",
+        f"du={latest_du}",
         f"best_du={best_score['duration']}",
         f"best_ep={best_score['step']}",
-        f"du_mean30={np.mean(episode_durations[-30:]):.3f}",
+        f"du_mean30={mean30:.3f}",
         f"random_action={eps*100.:.2f}%",
     ]
     return " | ".join(strs)
@@ -408,12 +399,17 @@ for i_episode in range(num_episodes):
 
     eps_in_episode = []
     screenshots = []
+    actions_history = []
     episode_index = len(episode_durations)
+    episode_durations.append(0)
 
     for duration in count(start=1):
+        episode_durations[-1] = duration
+
         # 행동 선택과 수행
         eps_threshold = get_epsilon(episode_index, EPS_DECAY)
         action = select_action(state, eps_threshold)
+        actions_history.append(action.item())
 
         observation, reward, terminated, truncated, info = env.step(action.item())
         reward = torch.tensor([reward], device=device)
@@ -429,8 +425,9 @@ for i_episode in range(num_episodes):
 
         # 로깅
         eps_in_episode.append(eps_threshold)
-        screenshots.append(get_screen(fullscreen=True, size=160))
-        progress.desc = get_progress_desc()
+        if duration < 1000:
+            screenshots.append(get_screen(size=240))
+        progress.set_description(get_progress_desc() + f" | reward: {reward.item()}")
 
         # 다음 상태로 이동
         state = next_state
@@ -438,22 +435,30 @@ for i_episode in range(num_episodes):
         # (정책 네트워크에서) 최적화 한단계 수행
         optimize_model()
 
-        if duration % 10 == 0:
-            target_net.load_state_dict(policy_net.state_dict())
+        # Soft update of the target network's weights
+        # θ′ ← τ θ + (1 −τ )θ′
+        target_net_state_dict = target_net.state_dict()
+        policy_net_state_dict = policy_net.state_dict()
+        for key in policy_net_state_dict:
+            target_net_state_dict[key] = policy_net_state_dict[key]*TAU + target_net_state_dict[key]*(1-TAU)
+        target_net.load_state_dict(target_net_state_dict)
 
         # 종료되면 로깅
         if done:
-            episode_durations.append(duration)
             episode_eps.append(np.mean(eps_in_episode))
-            if (i_episode % 10) == 0:
-                plot_progress()
-                save_log('logs/log.json')
+
             if best_score['duration'] < duration:
                 best_score['duration'] = duration
                 best_score['step'] = episode_index
                 best_score['screens'] = screenshots
-                save_screenshots(screenshots)
+                best_score['actions'] = actions_history
+                save_screenshots(screenshots, actions_history)
                 save_model_weights('model.pth')
+
+            if (i_episode % 10) == 0:
+                save_log('logs/log.json')
+                plot_progress()
+
             del screenshots
             break
 
@@ -488,5 +493,5 @@ def display_animation():
 display_animation()
 
 # %%
-save_screenshots(best_score['screens'])
+save_screenshots(best_score['screens'], best_score['actions'])
 save_model_weights('model.pth')
