@@ -1,5 +1,7 @@
 # Practice on RL
 
+![GitHub repo size](https://img.shields.io/github/repo-size/joonas-yoon/practice-on-rl?style=flat-square)
+
 ## Overview
 
 **Cart-Pole-v1 (DQN)**
