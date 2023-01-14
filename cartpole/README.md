@@ -13,6 +13,13 @@ Please see details on the file `run.log` under each directories.
 **Dashed line (blue): 30-Means duration
 ***Dashed line (very thin): the rate of exponential decay of epsilon
 
+Environment from Gym: https://www.gymlibrary.dev/environments/classic_control/cart_pole/
+
+Action (discrete):
+
+- 0: Push cart to the left
+- 1: Push cart to the right
+
 ## Requirements
 
 ```bash
@@ -22,7 +29,7 @@ $ pip install -r requirements.txt
 ## Run (CLI)
 
 ```
-$ cd dqn_v1+
+$ cd dqn_tutorial_en
 $ python run.py
 ```
 
