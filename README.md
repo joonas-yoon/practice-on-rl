@@ -4,7 +4,11 @@
 
 **Cart-Pole-v1 (DQN)**
 
-![gif](https://raw.githubusercontent.com/joonas-yoon/practice-on-rl/d0c0f96e14bdcf15dc5182efa397d5cdff03a9ff/dqn_v1%2B/screenshots/cartpolev1_770.gif)
+![cart-pole-770](https://raw.githubusercontent.com/joonas-yoon/practice-on-rl/d0c0f96e14bdcf15dc5182efa397d5cdff03a9ff/dqn_v1%2B/screenshots/cartpolev1_770.gif)
+
+**Mountain-Car (DQN)**
+
+![mountain-car-143](https://github.com/joonas-yoon/practice-on-rl/raw/main/mountaincar/screenshots/143.gif)
 
 ## Setting IPython kernel
 
