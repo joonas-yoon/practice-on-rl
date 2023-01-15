@@ -154,6 +154,7 @@ class Agent:
         torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
 
+    def episode_done(self):
         # Increase one step
         self._current_step += 1
 

@@ -67,3 +67,22 @@ class Renderer:
         # https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html#gif
         images[0].save(fp=output_path, format='GIF',
                        append_images=images, save_all=True, **kwargs)
+
+
+class ScreenshotRecorder:
+    images: list = []
+
+    def __init__(self, max_frames: int = 100) -> None:
+        self.max_frames = max_frames
+
+    def add_frame(self, renderer: Renderer, *arg, **kwargs):
+        if len(self.images) < self.max_frames:
+            self.images.append(renderer.get_screen(*arg, **kwargs))
+
+    def save(self, path: str, **kwargs) -> None:
+        Renderer.save_gif(self.images, path, **kwargs)
+
+    def flush(self) -> None:
+        if self.images:
+            del self.images
+        self.images = []
