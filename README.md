@@ -10,7 +10,7 @@
 
 **Mountain-Car (DQN)**
 
-![mountain-car-143](https://github.com/joonas-yoon/practice-on-rl/raw/main/mountaincar/screenshots/143.gif)
+![mountain-car-140](https://raw.githubusercontent.com/joonas-yoon/practice-on-rl/df361da29e2dd821e698f9b3a33770fb30a6028f/mountaincar/screenshots/0140.gif)
 
 ## Setting IPython kernel
 
