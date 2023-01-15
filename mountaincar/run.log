@@ -1,0 +1,9 @@
+Interactive python kernel enabled: False
+device: cuda
+Load model weights from model.pth
+  0%|                                                                                                                                                                                  | 0/20 [00:00<?, ?it/s]
+***\practice-on-rl\.venv\lib\site-packages\gym\utils\passive_env_checker.py:233: DeprecationWarning: `np.bool8` is a deprecated alias for `np.bool_`.  (Deprecated NumPy 1.24)
+  if not isinstance(terminated, (bool, np.bool8)):
+episode=50 | score=176 | score_mean30=379.43 | best_score=140 at 46 | random=12.29% | reward: -1.0: 100%|█████████████████████████████████████████████████████████████████████| 20/20 [04:36<00:00,  7.66s/it]
+Complete
+episode=50 | score=176 | score_mean30=379.43 | best_score=140 at 46 | random=12.29% | reward: -1.0: 100%|█████████████████████████████████████████████████████████████████████| 20/20 [04:36<00:00, 13.84s/it]
