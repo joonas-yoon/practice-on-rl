@@ -21,12 +21,13 @@ import torchvision.transforms as T
 from tqdm import tqdm as progressbar
 
 from agent import Agent, ReplayMemory, DQN
+from renderer import Renderer, resize, np_to_pil, tensor_to_np
 
 # matplotlib 설정
-is_ipython = 'inline' in matplotlib.get_backend()
-if is_ipython:
+is_interactive = 'inline' in matplotlib.get_backend()
+if is_interactive:
     from IPython import display
-print('ipython kernel enabled', is_ipython)
+print('Interactive python kernel enabled:', is_interactive)
 
 GYM_VERSION = gym.__version__[:4]
 
@@ -47,43 +48,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print('device:', device)
 
 
-# %%
-def resize(sz: int):
-  return T.Compose([
-    T.ToPILImage(),
-    T.Resize(sz, interpolation=T.InterpolationMode.BILINEAR),
-    T.ToTensor()
-  ])
-
-
 
 # %%
-def get_screen(size=120):
-    # gym이 요청한 화면은 400x600x3 이지만, 가끔 800x1200x3 처럼 큰 경우가 있습니다.
-    # 이것을 Torch order (CHW)로 변환한다.
-    screen = env.render().transpose((2, 0, 1))
+renderer = Renderer(env)
 
-    # float 으로 변환하고,  rescale 하고, torch tensor 로 변환하십시오.
-    # (이것은 복사를 필요로하지 않습니다)
-    screen = np.ascontiguousarray(screen, dtype=np.float32) / 255
-    screen = torch.from_numpy(screen)
-    # 크기를 수정하고 배치 차원(BCHW)을 추가하십시오.
-    return resize(size)(screen).unsqueeze(0)
-
-
-
-# %%
-def display_screen(title='Screen', *args, **kwargs):
-    plt.figure()
-    plt.axis('off')
-    plt.imshow(get_screen(*args, **kwargs).cpu().squeeze(0).permute(1, 2, 0).numpy(), interpolation='none')
-    plt.title(title)
-    plt.show()
-
-
-
-# %%
-display_screen(title='Game screen in global', size=240) if is_ipython else None
+if is_interactive:
+    renderer.display(title='Game screen in global', size=240)
 
 
 
@@ -120,8 +90,6 @@ def select_action(state):
     else:
         return torch.tensor([[env.action_space.sample()]], device=device, dtype=torch.long)
 
-
-
 # %%
 def load_log(path):
     try:
@@ -145,14 +113,12 @@ def load_log(path):
         )
 
 
-
 # %%
 logs = load_log('logs/log.json')
 
 episode_durations: list = logs['episode_durations']
 episode_eps: list = logs['episode_eps']
 best_score: dict = logs['best']
-
 
 
 # %%
@@ -173,10 +139,9 @@ def save_log(path):
         # print(f'\nsave log to {path}')
 
 
-
 # %%
 def plot_progress(show_result=False):
-    if is_ipython:
+    if is_interactive:
         if not show_result:
             display.display(plt.gcf())
             display.clear_output(wait=True)
@@ -209,7 +174,7 @@ def plot_progress(show_result=False):
 
     sns.lineplot(episode_eps, ax=ax2, linestyle='-.', color='#ABB7B7', linewidth=.75, alpha=0.5)
 
-    if is_ipython:
+    if is_interactive:
         plt.show()
     else:
         plt.savefig('plot/train.png', dpi=100)
@@ -219,13 +184,7 @@ def plot_progress(show_result=False):
 
 # %%
 import contextlib
-from PIL import Image, ImageDraw, ImageFont
-
-def tensor_to_np(t):
-    return t.squeeze(0).permute(1, 2, 0).numpy()
-
-def np_to_pil(np_img):
-    return Image.fromarray(np.uint8(np_img * 255.), mode="RGB")
+from PIL import ImageDraw, ImageFont
 
 def action_to_str(action):
     return ['LEFT', '', 'RIGHT'][action]
@@ -234,12 +193,12 @@ def save_screenshots(screens: list, actions: list):
     duration = max(len(screens), len(actions))
     if duration < 1: return
 
-    fp_out = f"screenshots/{duration:03}.gif"
+    fp_out = f"screenshots/{duration:04}.gif"
 
-    with contextlib.ExitStack() as stack:
-        imgs = []
-        font = ImageFont.truetype("verdana.ttf", 16)
+    imgs = []
+    font = ImageFont.truetype("verdana.ttf", 16)
 
+    with contextlib.ExitStack():
         for i, tensor in enumerate(screens):
             resize_img = resize(240)(tensor.squeeze(0))
             pil_img = np_to_pil(tensor_to_np(resize_img.cpu()))
@@ -247,13 +206,9 @@ def save_screenshots(screens: list, actions: list):
             draw.text((10, 10), f'step: {i}', fill=(200, 0, 0), font=font)
             action = action_to_str(actions[i])
             draw.text((10, 30), f'action: {action}', fill=(0, 0, 200), font=font)
-            if i + 1 == len(screens):
-                pil_img.info.update({'duration': 1000})
             imgs.append(pil_img)
 
-        # https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html#gif
-        imgs[0].save(fp=fp_out, format='GIF', append_images=imgs,
-                save_all=True, duration=1000/30, loop=0)
+        Renderer.save_gif(images=imgs, output_path=fp_out, duration=1000/30, loop=0)
 
 
 # %%
@@ -317,7 +272,7 @@ for i_episode in range(num_episodes):
         # 로깅
         eps_in_episode.append(agent.get_epsilon())
         if duration < 1000:
-            screenshots.append(get_screen(size=240))
+            screenshots.append(renderer.get_screen(size=240))
         progress.set_description(get_progress_desc() + f" | reward: {reward.item()}")
 
         # 다음 상태로 이동
@@ -367,7 +322,7 @@ plt.show()
 import matplotlib.animation as animation
 
 def display_animation():
-    if not is_ipython: return
+    if not is_interactive: return
     fig = plt.figure(figsize=(4, 3))
     ax = fig.add_subplot(111)
     plt.axis('off')
